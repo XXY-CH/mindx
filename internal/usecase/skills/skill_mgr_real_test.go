@@ -97,7 +97,7 @@ func TestAllSkillsRealExecution(t *testing.T) {
 			if err != nil {
 				if strings.Contains(err.Error(), "internal skill not registered") {
 					result.Status = "skipped"
-					result.Error = err.Error() + " (builtins registered at bootstrap)"
+					result.Error = fmt.Sprintf("%s (builtins registered at bootstrap)", err.Error())
 					skipCount++
 				} else {
 					result.Status = "failed"
