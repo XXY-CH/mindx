@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import './styles/Cron.css';
-import { useTranslation } from '../i18n';
 
 interface Job {
   id: string;
@@ -34,7 +33,6 @@ export default function Cron() {
   });
   const [actionLoading, setActionLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState('');
-  const { t } = useTranslation();
 
   useEffect(() => {
     fetchJobs();
