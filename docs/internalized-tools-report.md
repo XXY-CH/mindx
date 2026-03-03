@@ -134,35 +134,29 @@ cmd := exec.CommandContext(ctx, "sh", "-c", command)
 
 ---
 
-### 3.3 write_file — 文件写入防护
+### 3.3 write_file — 文件写入
 
-#### 修正后实现
+#### 设计理念
+
+与 `read_file` 一致，`write_file` 支持写入任意路径。相对路径基于 `$MINDX_WORKSPACE` 解析，绝对路径直接使用。
 
 ```go
-func validateAndSanitizePath(baseDir, userPath, filename string) (string, error) {
-    // 1. Clean 所有路径
-    cleanBase := filepath.Clean(baseDir)
-    cleanUserPath := filepath.Clean(userPath)
-    cleanFilename := filepath.Clean(filename)
-
-    // 2. 拒绝用户输入中的绝对路径
-    if filepath.IsAbs(cleanUserPath) {
-        return "", fmt.Errorf("absolute paths not allowed")
-    }
-
-    // 3. 拒绝 ".." 开头的路径和文件名
-    if strings.HasPrefix(cleanFilename, "..") { ... }
-    if strings.HasPrefix(cleanUserPath, "..") { ... }
-
-    // 4. 拼接后再次验证边界
-    rel, err := filepath.Rel(cleanBase, cleanFull)
-    if strings.HasPrefix(rel, "..") {
-        return "", fmt.Errorf("path traversal detected: result outside base directory")
-    }
+// 确定目标文件路径
+if filepath.IsAbs(cleanPath) {
+    filePath = filepath.Join(cleanPath, filename)
+} else {
+    filePath = filepath.Join(workDir, cleanPath, filename)
 }
 ```
 
-**写入范围限制**：仅允许写入 `$MINDX_WORKSPACE/documents/` 目录及其子目录。
+| 路径类型 | 行为 | 示例 |
+|---------|------|------|
+| 相对文件名 | 写入 `$MINDX_WORKSPACE/` | `note.txt` → `~/.mindx/note.txt` |
+| 相对目录+文件名 | 写入 `$MINDX_WORKSPACE/path/` | `path=documents/notes` → `~/.mindx/documents/notes/note.txt` |
+| 绝对路径文件名 | 直接使用 | `/tmp/output.txt` → `/tmp/output.txt` |
+| 绝对目录路径 | 直接使用 | `path=/tmp/reports` → `/tmp/reports/report.txt` |
+
+**安全保障**：`filepath.Clean()` 规范化路径。`terminal` 技能的危险命令拦截提供额外保护层。
 
 ---
 
@@ -204,20 +198,19 @@ func validateAndSanitizePath(baseDir, userPath, filename string) (string, error)
 | `TestTerminal_NewlineInjectionBlocked` | 换行符注入（拦截） | ✅ PASS |
 | `TestTerminal_VariableExpansionBlocked` | `${PATH}` 变量展开（拦截） | ✅ PASS |
 
-### write_file 测试（8 项）
+### write_file 测试（7 项）
 
 | 测试用例 | 验证内容 | 状态 |
 |---------|---------|------|
-| `TestValidateAndSanitizePath_ValidPath` | 有效路径 | ✅ PASS |
-| `TestValidateAndSanitizePath_PathTraversalInPath` | 路径中的遍历（拦截） | ✅ PASS |
-| `TestValidateAndSanitizePath_PathTraversalInFilename` | 文件名中的遍历（拦截） | ✅ PASS |
-| `TestValidateAndSanitizePath_AbsolutePath` | 绝对路径（拦截） | ✅ PASS |
-| `TestValidateAndSanitizePath_NestedValidPath` | 嵌套子目录路径 | ✅ PASS |
-| `TestWriteFile_PathTraversalPrevented` | 写入遍历攻击（拦截） | ✅ PASS |
-| `TestWriteFile_ValidWrite` | 正常文件写入 | ✅ PASS |
-| `TestWriteFile_ValidWriteWithPath` | 带子目录的文件写入 | ✅ PASS |
+| `TestWriteFile_ValidWrite` | 正常文件写入（workspace 根） | ✅ PASS |
+| `TestWriteFile_ValidWriteWithRelativePath` | 相对子目录写入 | ✅ PASS |
+| `TestWriteFile_AbsolutePathInFilename` | 绝对路径文件名（允许） | ✅ PASS |
+| `TestWriteFile_AbsolutePathParam` | 绝对目录路径参数（允许） | ✅ PASS |
+| `TestWriteFile_MissingFilename` | 缺少文件名（拦截） | ✅ PASS |
+| `TestWriteFile_MissingContent` | 缺少内容（拦截） | ✅ PASS |
+| `TestWriteFile_DocumentsSubdir` | documents 子目录写入 | ✅ PASS |
 
-**全部 23 项测试通过** ✅
+**全部测试通过** ✅
 
 ---
 
@@ -225,19 +218,16 @@ func validateAndSanitizePath(baseDir, userPath, filename string) (string, error)
 
 ```
 ┌──────────────────────────────────────────────────┐
-│              全文件系统（read_file 可读取）          │
+│          全文件系统（read_file / write_file）       │
 │                                                    │
 │  ┌────────────────────────────────────────────┐   │
 │  │            MINDX_WORKSPACE                  │   │
-│  │  ┌──────────────┐  ┌──────────────┐        │   │
-│  │  │  documents/   │  │    data/      │        │   │
-│  │  │  (读+写)      │  │  (读)         │        │   │
-│  │  └──────────────┘  └──────────────┘        │   │
-│  │  write_file 写入限制在 documents/ 内         │   │
+│  │  相对路径默认解析到此目录                      │   │
 │  └────────────────────────────────────────────┘   │
 │                                                    │
-│  /etc/hosts  ~/Desktop  /var/log  ...              │
-│  （read_file 均可读取，write_file 不可写入）         │
+│  read_file: 可读取任意路径                          │
+│  write_file: 可写入任意路径                         │
+│  terminal: 危险命令拦截层保护                       │
 └──────────────────────────────────────────────────┘
 ```
 
@@ -248,8 +238,8 @@ func validateAndSanitizePath(baseDir, userPath, filename string) (string, error)
 | 设计原则 | 实现体现 |
 |---------|---------|
 | 轻量化 | Go 内置实现，无外部依赖 |
-| 功能完整 | read_file 可读取任意文件，不因隔离导致功能缺失 |
-| 安全写入 | write_file 仍限制在 workspace/documents 内 |
+| 功能完整 | read_file / write_file 可访问任意路径，不因隔离导致功能缺失 |
+| 安全保护 | terminal 危险命令拦截、filepath.Clean 路径规范化 |
 | 跨平台 | Windows + macOS + Linux 全支持 |
 | 零配置 | 默认可用，无需额外配置 |
-| 可测试 | 23 项自动化测试覆盖核心场景 |
+| 可测试 | 自动化测试覆盖核心场景 |

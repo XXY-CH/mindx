@@ -9,67 +9,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestValidateAndSanitizePath_ValidPath(t *testing.T) {
-	baseDir := "/tmp/test/documents"
-	result, err := validateAndSanitizePath(baseDir, "subdir", "test.txt")
-	assert.NoError(t, err)
-	assert.Equal(t, filepath.Join(baseDir, "subdir", "test.txt"), result)
-}
-
-func TestValidateAndSanitizePath_PathTraversalInPath(t *testing.T) {
-	baseDir := "/tmp/test/documents"
-	_, err := validateAndSanitizePath(baseDir, "../../../etc", "passwd")
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "path traversal detected")
-}
-
-func TestValidateAndSanitizePath_PathTraversalInFilename(t *testing.T) {
-	baseDir := "/tmp/test/documents"
-	_, err := validateAndSanitizePath(baseDir, "subdir", "../../etc/passwd")
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "path traversal detected")
-}
-
-func TestValidateAndSanitizePath_AbsolutePath(t *testing.T) {
-	baseDir := "/tmp/test/documents"
-	_, err := validateAndSanitizePath(baseDir, "/etc", "passwd")
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "absolute paths not allowed")
-}
-
-func TestValidateAndSanitizePath_NestedValidPath(t *testing.T) {
-	baseDir := "/tmp/test/documents"
-	result, err := validateAndSanitizePath(baseDir, "a/b/c", "file.txt")
-	assert.NoError(t, err)
-	assert.Equal(t, filepath.Join(baseDir, "a/b/c", "file.txt"), result)
-}
-
-func TestWriteFile_PathTraversalPrevented(t *testing.T) {
-	tmpDir := t.TempDir()
-	os.Setenv("MINDX_WORKSPACE", tmpDir)
-	defer os.Unsetenv("MINDX_WORKSPACE")
-
-	// Create documents dir
-	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "documents"), 0755))
-
-	params := map[string]any{
-		"filename": "test.txt",
-		"content":  "hello",
-		"path":     "../../etc",
-	}
-
-	_, err := WriteFile(params)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "path traversal detected")
-}
-
 func TestWriteFile_ValidWrite(t *testing.T) {
 	tmpDir := t.TempDir()
 	os.Setenv("MINDX_WORKSPACE", tmpDir)
 	defer os.Unsetenv("MINDX_WORKSPACE")
-
-	// Create documents dir
-	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "documents"), 0755))
 
 	params := map[string]any{
 		"filename": "test.txt",
@@ -80,13 +23,13 @@ func TestWriteFile_ValidWrite(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Contains(t, result, "test.txt")
 
-	// Verify file was actually written
-	content, err := os.ReadFile(filepath.Join(tmpDir, "documents", "test.txt"))
+	// Verify file was written at workspace root
+	content, err := os.ReadFile(filepath.Join(tmpDir, "test.txt"))
 	assert.NoError(t, err)
 	assert.Equal(t, "hello world", string(content))
 }
 
-func TestWriteFile_ValidWriteWithPath(t *testing.T) {
+func TestWriteFile_ValidWriteWithRelativePath(t *testing.T) {
 	tmpDir := t.TempDir()
 	os.Setenv("MINDX_WORKSPACE", tmpDir)
 	defer os.Unsetenv("MINDX_WORKSPACE")
@@ -101,8 +44,91 @@ func TestWriteFile_ValidWriteWithPath(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Contains(t, result, "test.txt")
 
-	// Verify file was actually written in the subdirectory
-	content, err := os.ReadFile(filepath.Join(tmpDir, "documents", "subdir", "test.txt"))
+	// Verify file was written in the subdirectory
+	content, err := os.ReadFile(filepath.Join(tmpDir, "subdir", "test.txt"))
 	assert.NoError(t, err)
 	assert.Equal(t, "hello world", string(content))
+}
+
+func TestWriteFile_AbsolutePathInFilename(t *testing.T) {
+	tmpDir := t.TempDir()
+	os.Setenv("MINDX_WORKSPACE", tmpDir)
+	defer os.Unsetenv("MINDX_WORKSPACE")
+
+	targetFile := filepath.Join(tmpDir, "outside", "abs_test.txt")
+
+	params := map[string]any{
+		"filename": targetFile,
+		"content":  "absolute write",
+	}
+
+	result, err := WriteFile(params)
+	assert.NoError(t, err)
+	assert.Contains(t, result, "abs_test.txt")
+
+	content, err := os.ReadFile(targetFile)
+	assert.NoError(t, err)
+	assert.Equal(t, "absolute write", string(content))
+}
+
+func TestWriteFile_AbsolutePathParam(t *testing.T) {
+	tmpDir := t.TempDir()
+	os.Setenv("MINDX_WORKSPACE", tmpDir)
+	defer os.Unsetenv("MINDX_WORKSPACE")
+
+	targetDir := filepath.Join(tmpDir, "abs_dir")
+
+	params := map[string]any{
+		"filename": "result.txt",
+		"content":  "abs path write",
+		"path":     targetDir,
+	}
+
+	result, err := WriteFile(params)
+	assert.NoError(t, err)
+	assert.Contains(t, result, "result.txt")
+
+	content, err := os.ReadFile(filepath.Join(targetDir, "result.txt"))
+	assert.NoError(t, err)
+	assert.Equal(t, "abs path write", string(content))
+}
+
+func TestWriteFile_MissingFilename(t *testing.T) {
+	params := map[string]any{
+		"content": "hello",
+	}
+
+	_, err := WriteFile(params)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid param: filename")
+}
+
+func TestWriteFile_MissingContent(t *testing.T) {
+	params := map[string]any{
+		"filename": "test.txt",
+	}
+
+	_, err := WriteFile(params)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid param: content")
+}
+
+func TestWriteFile_DocumentsSubdir(t *testing.T) {
+	tmpDir := t.TempDir()
+	os.Setenv("MINDX_WORKSPACE", tmpDir)
+	defer os.Unsetenv("MINDX_WORKSPACE")
+
+	params := map[string]any{
+		"filename": "note.txt",
+		"content":  "document content",
+		"path":     "documents/notes",
+	}
+
+	result, err := WriteFile(params)
+	assert.NoError(t, err)
+	assert.Contains(t, result, "note.txt")
+
+	content, err := os.ReadFile(filepath.Join(tmpDir, "documents", "notes", "note.txt"))
+	require.NoError(t, err)
+	assert.Equal(t, "document content", string(content))
 }

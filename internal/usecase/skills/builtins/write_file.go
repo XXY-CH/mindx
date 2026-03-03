@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 )
 
-// WriteFile writes content to a file with security validation
+// WriteFile writes content to a file
+// Supports absolute paths directly; relative paths resolve against MINDX_WORKSPACE
 func WriteFile(params map[string]any) (string, error) {
 	filename, ok := params["filename"].(string)
-	if !ok {
+	if !ok || filename == "" {
 		return "", fmt.Errorf("invalid param: filename")
 	}
 
@@ -23,25 +23,34 @@ func WriteFile(params map[string]any) (string, error) {
 
 	startTime := time.Now()
 
-	workDir := os.Getenv("MINDX_WORKSPACE")
-	if workDir == "" {
-		return "", fmt.Errorf("MINDX_WORKSPACE environment variable is not set")
-	}
-
-	baseDir := filepath.Join(workDir, "documents")
-
+	// Determine the target file path
 	var filePath string
+
 	if path, ok := params["path"].(string); ok && path != "" {
-		// SECURITY: Validate path to prevent traversal
-		validatedPath, err := validateAndSanitizePath(baseDir, path, filename)
-		if err != nil {
-			return "", err
+		// "path" param provided: treat as directory, append filename
+		cleanPath := filepath.Clean(path)
+		if filepath.IsAbs(cleanPath) {
+			filePath = filepath.Join(cleanPath, filename)
+		} else {
+			workDir := os.Getenv("MINDX_WORKSPACE")
+			if workDir == "" {
+				return "", fmt.Errorf("MINDX_WORKSPACE environment variable is not set")
+			}
+			filePath = filepath.Join(workDir, cleanPath, filename)
 		}
-		filePath = validatedPath
+	} else if filepath.IsAbs(filepath.Clean(filename)) {
+		// filename itself is an absolute path
+		filePath = filepath.Clean(filename)
 	} else {
-		// No path specified, use base directory
-		filePath = filepath.Join(baseDir, filename)
+		// Relative filename: resolve against workspace
+		workDir := os.Getenv("MINDX_WORKSPACE")
+		if workDir == "" {
+			return "", fmt.Errorf("MINDX_WORKSPACE environment variable is not set")
+		}
+		filePath = filepath.Join(workDir, filename)
 	}
+
+	filePath = filepath.Clean(filePath)
 
 	dir := filepath.Dir(filePath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -60,44 +69,6 @@ func WriteFile(params map[string]any) (string, error) {
 	}
 
 	return getJSONWriteResult(absPath, len(content), elapsed)
-}
-
-// validateAndSanitizePath validates and sanitizes a file path to prevent path traversal attacks
-func validateAndSanitizePath(baseDir, userPath, filename string) (string, error) {
-	// Clean all paths
-	cleanBase := filepath.Clean(baseDir)
-	cleanUserPath := filepath.Clean(userPath)
-	cleanFilename := filepath.Clean(filename)
-
-	// Reject absolute paths in user input
-	if filepath.IsAbs(cleanUserPath) {
-		return "", fmt.Errorf("absolute paths not allowed in user path")
-	}
-
-	// Reject paths containing ..
-	if strings.HasPrefix(cleanFilename, "..") {
-		return "", fmt.Errorf("path traversal detected: .. not allowed in filename")
-	}
-
-	if strings.HasPrefix(cleanUserPath, "..") {
-		return "", fmt.Errorf("path traversal detected: .. not allowed in path")
-	}
-
-	// Join paths
-	fullPath := filepath.Join(cleanBase, cleanUserPath, cleanFilename)
-	cleanFull := filepath.Clean(fullPath)
-
-	// Ensure the result is still within base directory
-	rel, err := filepath.Rel(cleanBase, cleanFull)
-	if err != nil {
-		return "", fmt.Errorf("invalid path: %w", err)
-	}
-
-	if strings.HasPrefix(rel, "..") {
-		return "", fmt.Errorf("path traversal detected: result outside base directory")
-	}
-
-	return cleanFull, nil
 }
 
 func getJSONWriteResult(filePath string, contentLength int, elapsed time.Duration) (string, error) {
