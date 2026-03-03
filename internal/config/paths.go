@@ -63,6 +63,10 @@ func GetInstallPath() (string, error) {
 		execPath, err := os.Executable()
 		if err == nil {
 			path = filepath.Dir(execPath)
+			// If executable is in a bin/ directory, use the parent as install path
+			if filepath.Base(path) == "bin" {
+				path = filepath.Dir(path)
+			}
 		} else {
 			path, err = os.Getwd()
 			if err != nil {

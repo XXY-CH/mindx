@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -26,11 +27,40 @@ func WriteFile(params map[string]any) (string, error) {
 		return "", fmt.Errorf("MINDX_WORKSPACE environment variable is not set")
 	}
 
+	baseDir := filepath.Join(workDir, "documents")
+
+	// Sanitize filename to prevent path traversal
+	cleanFilename := filepath.Clean(filename)
+	if strings.HasPrefix(cleanFilename, "..") || filepath.IsAbs(cleanFilename) {
+		return "", fmt.Errorf("invalid filename: path traversal detected")
+	}
+
 	var filePath string
 	if path, ok := params["path"].(string); ok && path != "" {
-		filePath = filepath.Join(workDir, "documents", path, filename)
+		// Validate user-provided path against base directory
+		cleanPath := filepath.Clean(path)
+		if strings.HasPrefix(cleanPath, "..") || filepath.IsAbs(cleanPath) {
+			return "", fmt.Errorf("invalid path: path traversal detected")
+		}
+		fullPath := filepath.Join(baseDir, cleanPath, cleanFilename)
+		// Verify the resolved path is still under baseDir
+		absBase, _ := filepath.Abs(baseDir)
+		absFull, _ := filepath.Abs(fullPath)
+		rel, err := filepath.Rel(absBase, absFull)
+		if err != nil || strings.HasPrefix(rel, "..") {
+			return "", fmt.Errorf("invalid path: path traversal detected")
+		}
+		filePath = fullPath
 	} else {
-		filePath = filepath.Join(workDir, "documents", filename)
+		// Validate filename even without path parameter
+		fullPath := filepath.Join(baseDir, cleanFilename)
+		absBase, _ := filepath.Abs(baseDir)
+		absFull, _ := filepath.Abs(fullPath)
+		rel, err := filepath.Rel(absBase, absFull)
+		if err != nil || strings.HasPrefix(rel, "..") {
+			return "", fmt.Errorf("invalid filename: path traversal detected")
+		}
+		filePath = fullPath
 	}
 
 	dir := filepath.Dir(filePath)

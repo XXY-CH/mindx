@@ -26,6 +26,10 @@ parameters:
     type: number
     description: 超时时间（秒），默认30秒
     required: false
+  dangerous:
+    type: boolean
+    description: 是否允许执行危险命令（rm, dd, mkfs等），默认false
+    required: false
 ---
 
 # 终端技能
