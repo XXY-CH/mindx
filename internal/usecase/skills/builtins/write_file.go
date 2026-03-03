@@ -8,9 +8,11 @@ import (
 	"time"
 )
 
+// WriteFile writes content to a file
+// Supports absolute paths directly; relative paths resolve against MINDX_WORKSPACE
 func WriteFile(params map[string]any) (string, error) {
 	filename, ok := params["filename"].(string)
-	if !ok {
+	if !ok || filename == "" {
 		return "", fmt.Errorf("invalid param: filename")
 	}
 
@@ -21,16 +23,32 @@ func WriteFile(params map[string]any) (string, error) {
 
 	startTime := time.Now()
 
-	workDir := os.Getenv("MINDX_WORKSPACE")
-	if workDir == "" {
-		return "", fmt.Errorf("MINDX_WORKSPACE environment variable is not set")
-	}
-
+	// Determine the target file path
 	var filePath string
+	cleanFilename := filepath.Clean(filename)
+
 	if path, ok := params["path"].(string); ok && path != "" {
-		filePath = filepath.Join(workDir, "documents", path, filename)
+		// "path" param provided: treat as directory, append filename
+		cleanPath := filepath.Clean(path)
+		if filepath.IsAbs(cleanPath) {
+			filePath = filepath.Join(cleanPath, cleanFilename)
+		} else {
+			workDir := os.Getenv("MINDX_WORKSPACE")
+			if workDir == "" {
+				return "", fmt.Errorf("MINDX_WORKSPACE environment variable is not set")
+			}
+			filePath = filepath.Join(workDir, cleanPath, cleanFilename)
+		}
+	} else if filepath.IsAbs(cleanFilename) {
+		// filename itself is an absolute path
+		filePath = cleanFilename
 	} else {
-		filePath = filepath.Join(workDir, "documents", filename)
+		// Relative filename: resolve against workspace
+		workDir := os.Getenv("MINDX_WORKSPACE")
+		if workDir == "" {
+			return "", fmt.Errorf("MINDX_WORKSPACE environment variable is not set")
+		}
+		filePath = filepath.Join(workDir, cleanFilename)
 	}
 
 	dir := filepath.Dir(filePath)

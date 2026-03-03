@@ -121,6 +121,10 @@ func (h *ConfigHandler) GetGeneralConfig(c *gin.Context) {
 			"address": serverCfg.Host,
 			"port":    serverCfg.Port,
 		},
+		"gateway_protection": gin.H{
+			"enabled": serverCfg.GatewayProtection.Enabled,
+			"mode":    serverCfg.GatewayProtection.Mode,
+		},
 	})
 }
 
@@ -131,6 +135,10 @@ func (h *ConfigHandler) SaveGeneralConfig(c *gin.Context) {
 			Address string `json:"address"`
 			Port    int    `json:"port"`
 		} `json:"server"`
+		GatewayProtection struct {
+			Enabled bool   `json:"enabled"`
+			Mode    string `json:"mode"`
+		} `json:"gateway_protection"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -145,6 +153,8 @@ func (h *ConfigHandler) SaveGeneralConfig(c *gin.Context) {
 
 	serverCfg.Host = req.Server.Address
 	serverCfg.Port = req.Server.Port
+	serverCfg.GatewayProtection.Enabled = req.GatewayProtection.Enabled
+	serverCfg.GatewayProtection.Mode = req.GatewayProtection.Mode
 
 	if err := config.SaveServerConfig(serverCfg); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
