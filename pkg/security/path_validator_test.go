@@ -3,6 +3,7 @@ package security
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -86,7 +87,7 @@ func TestValidatePath(t *testing.T) {
 				if relErr != nil {
 					t.Errorf("result path not relative to base: %v", relErr)
 				}
-				if filepath.IsAbs(rel) || rel[:2] == ".." {
+				if strings.HasPrefix(rel, "..") {
 					t.Errorf("result path %s escapes base dir %s", result, absBase)
 				}
 			}

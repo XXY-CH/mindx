@@ -29,7 +29,11 @@ func ValidateCommand(command string, dangerousAllowed bool) error {
 	}
 
 	// Extract the base command (first word)
-	baseCmd := strings.Fields(command)[0]
+	fields := strings.Fields(command)
+	if len(fields) == 0 {
+		return fmt.Errorf("command is empty")
+	}
+	baseCmd := fields[0]
 
 	// Check against known dangerous commands
 	if !dangerousAllowed && IsDangerousCommand(baseCmd) {

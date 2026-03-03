@@ -62,7 +62,7 @@ REAL_BASE=$(normalize_path "$BASE_DIR") || {
 }
 
 # 检查规范化后的路径是否仍在基础目录内
-if [[ "$REAL_PATH" != "$REAL_BASE"* ]]; then
+if [[ "$REAL_PATH" != "$REAL_BASE" ]] && [[ "$REAL_PATH" != "$REAL_BASE"/* ]]; then
     echo '{"error": "Access denied: path outside allowed directory"}'
     exit 1
 fi
