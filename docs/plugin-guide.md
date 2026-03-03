@@ -1,24 +1,25 @@
 # MindX 插件化功能添加建议方案
 
-## 一、认证模块架构回顾
+## 一、Gateway 防护模块架构回顾
 
 ### 当前设计确认
 
-MindX 的认证模块已经采用了**插件化（Plugin）**设计，核心要点如下：
+MindX 的 Gateway 防护模块已经采用了**插件化（Plugin）**设计，核心要点如下：
 
 1. **接口解耦**：`core.AuthProvider` 接口定义在核心层（`internal/core/auth.go`），但不包含任何具体实现
-2. **默认无认证**：`NoopProvider`（`internal/usecase/auth/noop_provider.go`）作为默认提供者，`Enabled()` 返回 `false`，所有请求直接放行
-3. **可选注入**：`NewServer()` 通过可变参数 `authProvider ...core.AuthProvider` 接受认证插件，不传入则不启用
-4. **公开路径白名单**：`PublicPaths()` 允许插件声明不需要认证的路径（如 `/health`、`/api/auth/login`）
-5. **i18n 支持**：中间件将 i18n 翻译后的未授权消息注入到请求上下文，认证插件可通过 `c.Get("auth.unauthorized_message")` 获取
+2. **默认不启用**：`NoopProvider`（`internal/usecase/auth/noop_provider.go`）作为默认提供者，`Enabled()` 返回 `false`，所有请求直接放行
+3. **可选注入**：`NewServer()` 通过可变参数 `authProvider ...core.AuthProvider` 接受防护插件，不传入则不启用
+4. **公开路径白名单**：`PublicPaths()` 允许插件声明不需要防护的路径（如 `/health`）
+5. **i18n 支持**：中间件将 i18n 翻译后的拒绝消息注入到请求上下文，防护插件可通过 `c.Get("auth.unauthorized_message")` 获取
+6. **前端面板开关**：通过 GeneralSettings 面板可选地开启/关闭 Gateway 防护，配置持久化到 `server.yml` 的 `gateway_protection` 字段
 
 ### 设计初衷
 
-认证模块的初衷是**保护 Gateway 不被外部入侵**，而不是强制用户每次进入都登录。这避免了以下问题：
+防护模块的初衷是**保护 Gateway 不被外部入侵**，而不是要求用户登录。这完全规避了以下问题：
 
 > "在这个阶段是否真的需要增加登录？每次进入都可能会提示，虽然可以用记住密码跳过，但就变得意义不大。"
 
-通过插件化设计，认证功能仅在需要时按需启用，不影响默认使用体验。
+通过插件化设计，防护功能仅在需要时按需启用（通过前端面板或配置文件），不影响默认使用体验，也不会产生任何登录提示。
 
 ---
 
@@ -141,7 +142,7 @@ func WithRateLimiter(provider core.RateLimiterProvider) ServerOption {
 
 | 功能模块 | 接口名称 | 说明 |
 |---------|---------|------|
-| 认证 | `AuthProvider` | ✅ 已实现，保护 Gateway 不被外部入侵 |
+| Gateway 防护 | `AuthProvider` | ✅ 已实现，保护 Gateway 不被外部入侵，可在前端面板开关 |
 | 限流 | `RateLimiterProvider` | 防止 API 被恶意大量调用 |
 | 审计日志 | `AuditLogProvider` | 记录关键操作便于审计追踪 |
 | 通知 | `NotificationProvider` | 异常告警通知（邮件、Webhook 等） |

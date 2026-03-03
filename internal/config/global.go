@@ -13,7 +13,15 @@ type GlobalConfig struct {
 	DefaultModel   string            `mapstructure:"default_model" json:"default_model" yaml:"default_model"`
 	Memory         MemoryConfig      `mapstructure:"memory,omitempty" json:"memory,omitempty" yaml:"memory,omitempty"`
 	VectorStore    VectorStoreConfig `mapstructure:"vector_store" json:"vector_store" yaml:"vector_store"`
-	WebSocket      WebSocketConfig   `mapstructure:"websocket,omitempty" json:"websocket,omitempty" yaml:"websocket,omitempty"`
+	WebSocket          WebSocketConfig          `mapstructure:"websocket,omitempty" json:"websocket,omitempty" yaml:"websocket,omitempty"`
+	GatewayProtection  GatewayProtectionConfig  `mapstructure:"gateway_protection,omitempty" json:"gateway_protection,omitempty" yaml:"gateway_protection,omitempty"`
+}
+
+// GatewayProtectionConfig Gateway 防护插件配置
+// 用于保护 Gateway 不被外部入侵，不是用户登录机制
+type GatewayProtectionConfig struct {
+	Enabled bool   `mapstructure:"enabled" json:"enabled" yaml:"enabled"`
+	Mode    string `mapstructure:"mode,omitempty" json:"mode,omitempty" yaml:"mode,omitempty"` // "api_key" | "token" 等
 }
 
 type WebSocketConfig struct {

@@ -782,8 +782,8 @@
   "memory.single_mem_store_complete": "Single memory point stored successfully",
   "memory.gen_combined_summary_failed": "Failed to generate combined summary, using first memory point's summary",
 
-  "auth.unauthorized": "Unauthorized access",
-  "auth.plugin.noop": "Default auth provider (authentication disabled)",
-  "auth.plugin.enabled": "Auth plugin enabled: {{.Name}}",
-  "auth.plugin.disabled": "Auth plugin not enabled, all requests pass through"
+  "auth.unauthorized": "Access denied",
+  "auth.plugin.noop": "Default Gateway protection provider (protection disabled)",
+  "auth.plugin.enabled": "Gateway protection plugin enabled: {{.Name}}",
+  "auth.plugin.disabled": "Gateway protection plugin not enabled, all requests pass through"
 }

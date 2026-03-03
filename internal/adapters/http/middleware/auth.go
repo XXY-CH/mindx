@@ -8,11 +8,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Auth 认证中间件（插件化设计）
+// Auth Gateway 防护中间件（插件化设计）
 //
-// 采用 AuthProvider 接口实现插件化认证，不与核心层耦合。
-// 设计目标：保护 Gateway 不被外部入侵，而非强制用户登录。
-// 当 AuthProvider 为 nil 或未启用时，所有请求直接放行，避免不必要的登录提示。
+// 采用 AuthProvider 接口实现插件化 Gateway 防护，不与核心层耦合。
+// 设计目标：保护 Gateway 不被外部入侵，而不是要求用户登录。
+// 当 AuthProvider 为 nil 或未启用时，所有请求直接放行。
 func Auth(provider core.AuthProvider) gin.HandlerFunc {
 	if provider == nil || !provider.Enabled() {
 		return func(c *gin.Context) {

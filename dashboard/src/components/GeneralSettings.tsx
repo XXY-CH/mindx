@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from './i18n';
 import './GeneralSettings.css';
 
 interface GeneralConfig {
@@ -7,14 +8,23 @@ interface GeneralConfig {
     address: string;
     port: number;
   };
+  gateway_protection: {
+    enabled: boolean;
+    mode: string;
+  };
 }
 
 export default function GeneralSettings() {
+  const { t } = useTranslation();
   const [config, setConfig] = useState<GeneralConfig>({
     workplace: 'data',
     server: {
       address: '0.0.0.0',
       port: 1314,
+    },
+    gateway_protection: {
+      enabled: false,
+      mode: '',
     },
   });
   const [loading, setLoading] = useState(false);
@@ -28,7 +38,11 @@ export default function GeneralSettings() {
     try {
       const response = await fetch('/api/config/general');
       const data = await response.json();
-      setConfig(data);
+      setConfig({
+        workplace: data.workplace || 'data',
+        server: data.server || { address: '0.0.0.0', port: 1314 },
+        gateway_protection: data.gateway_protection || { enabled: false, mode: '' },
+      });
     } catch (error) {
       console.error('Failed to fetch config:', error);
     }
@@ -47,20 +61,43 @@ export default function GeneralSettings() {
       });
 
       if (response.ok) {
-        setMessage('配置保存成功！');
+        setMessage(t('settings.saveSuccess') || '配置保存成功！');
       } else {
-        setMessage('配置保存失败');
+        setMessage(t('settings.saveFailed') || '配置保存失败');
       }
     } catch (error) {
       console.error('Failed to save config:', error);
-      setMessage('配置保存失败');
+      setMessage(t('settings.saveFailed') || '配置保存失败');
     }
     setLoading(false);
   };
 
   return (
     <div className="general-settings">
-      <h2>通用配置</h2>
+      <h2>{t('settings.general')}</h2>
+
+      <div className="config-section">
+        <h3>{t('settings.gatewayProtection')}</h3>
+        <p className="config-description">{t('settings.gatewayProtectionDesc')}</p>
+        <div className="config-item">
+          <label>{t('settings.gatewayProtection')}</label>
+          <div
+            className={`toggle-switch ${config.gateway_protection.enabled ? 'active' : ''}`}
+            onClick={() => setConfig({
+              ...config,
+              gateway_protection: {
+                ...config.gateway_protection,
+                enabled: !config.gateway_protection.enabled,
+              },
+            })}
+          >
+            <div className="toggle-knob" />
+            <span className="toggle-label">
+              {config.gateway_protection.enabled ? t('settings.gatewayEnabled') : t('settings.gatewayDisabled')}
+            </span>
+          </div>
+        </div>
+      </div>
 
       <div className="config-section">
         <h3>工作区设置</h3>
@@ -103,7 +140,7 @@ export default function GeneralSettings() {
         </button>
       </div>
 
-      {message && <div className={`message ${message.includes('成功') ? 'success' : 'error'}`}>{message}</div>}
+      {message && <div className={`message ${message.includes('成功') || message.includes('success') ? 'success' : 'error'}`}>{message}</div>}
     </div>
   );
 }

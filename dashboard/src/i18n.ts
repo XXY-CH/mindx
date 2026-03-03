@@ -201,6 +201,10 @@ const translations = {
       darkMode: '深色模式',
       lightMode: '浅色模式',
       autoMode: '跟随系统',
+      gatewayProtection: 'Gateway 防护',
+      gatewayProtectionDesc: '保护 Gateway 不被外部入侵（非用户登录），启用后外部请求需携带有效凭证',
+      gatewayEnabled: '已开启',
+      gatewayDisabled: '已关闭',
     },
     advanced: {
       title: '高级配置',
@@ -472,6 +476,10 @@ const translations = {
       darkMode: 'Dark Mode',
       lightMode: 'Light Mode',
       autoMode: 'Auto',
+      gatewayProtection: 'Gateway Protection',
+      gatewayProtectionDesc: 'Protect Gateway from external intrusion (not user login). When enabled, external requests require valid credentials',
+      gatewayEnabled: 'Enabled',
+      gatewayDisabled: 'Disabled',
     },
     advanced: {
       title: 'Advanced Settings',
