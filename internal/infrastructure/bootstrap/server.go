@@ -13,6 +13,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"mindx/internal/adapters/http/middleware"
+	"mindx/internal/core"
 )
 
 // Server HTTP API 服务器
@@ -27,7 +28,8 @@ type Server struct {
 }
 
 // NewServer 创建 HTTP API 服务器实例
-func NewServer(port int, staticDir string) (*Server, error) {
+// authProvider 为可选的认证插件，传入 nil 或 NoopProvider 则不启用认证
+func NewServer(port int, staticDir string, authProvider ...core.AuthProvider) (*Server, error) {
 	// 默认端口 1314
 	if port <= 0 {
 		port = 1314
@@ -43,6 +45,11 @@ func NewServer(port int, staticDir string) (*Server, error) {
 	engine.Use(gin.Logger())
 	engine.Use(middleware.RequestID())
 	engine.Use(middleware.MetricsMiddleware())
+
+	// 插件化认证中间件（默认不启用）
+	if len(authProvider) > 0 && authProvider[0] != nil {
+		engine.Use(middleware.Auth(authProvider[0]))
+	}
 
 	return &Server{
 		engine:         engine,
