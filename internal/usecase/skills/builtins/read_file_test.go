@@ -14,10 +14,8 @@ func TestReadFile_ValidFile(t *testing.T) {
 	os.Setenv("MINDX_WORKSPACE", tmpDir)
 	defer os.Unsetenv("MINDX_WORKSPACE")
 
-	// Create documents dir and test file
-	docsDir := filepath.Join(tmpDir, "documents")
-	require.NoError(t, os.MkdirAll(docsDir, 0755))
-	require.NoError(t, os.WriteFile(filepath.Join(docsDir, "test.txt"), []byte("hello world"), 0644))
+	// Create test file at workspace root
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "test.txt"), []byte("hello world"), 0644))
 
 	params := map[string]any{
 		"path": "test.txt",
@@ -34,13 +32,11 @@ func TestReadFile_AbsolutePath(t *testing.T) {
 	os.Setenv("MINDX_WORKSPACE", tmpDir)
 	defer os.Unsetenv("MINDX_WORKSPACE")
 
-	// Create documents dir and file inside it
-	docsDir := filepath.Join(tmpDir, "documents")
-	require.NoError(t, os.MkdirAll(docsDir, 0755))
-	testFile := filepath.Join(docsDir, "absolute_test.txt")
+	// Create file inside workspace
+	testFile := filepath.Join(tmpDir, "absolute_test.txt")
 	require.NoError(t, os.WriteFile(testFile, []byte("absolute content"), 0644))
 
-	// Absolute path within workspace should work
+	// Absolute path should work
 	params := map[string]any{
 		"path": testFile,
 	}
@@ -55,38 +51,46 @@ func TestReadFile_AbsolutePathOutsideWorkspace(t *testing.T) {
 	os.Setenv("MINDX_WORKSPACE", tmpDir)
 	defer os.Unsetenv("MINDX_WORKSPACE")
 
-	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "documents"), 0755))
+	// Create a file outside workspace
+	outsideDir := t.TempDir()
+	outsideFile := filepath.Join(outsideDir, "outside.txt")
+	require.NoError(t, os.WriteFile(outsideFile, []byte("outside content"), 0644))
 
-	// Absolute path outside workspace should be blocked
+	// Absolute path outside workspace should be allowed
 	params := map[string]any{
-		"path": "/etc/passwd",
+		"path": outsideFile,
 	}
 
-	_, err := ReadFile(params)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "access denied")
+	result, err := ReadFile(params)
+	assert.NoError(t, err)
+	assert.Contains(t, result, "outside content")
+	assert.Contains(t, result, `"success": true`)
 }
 
-func TestReadFile_PathTraversal(t *testing.T) {
+func TestReadFile_RelativePathResolvesToWorkspace(t *testing.T) {
 	tmpDir := t.TempDir()
 	os.Setenv("MINDX_WORKSPACE", tmpDir)
 	defer os.Unsetenv("MINDX_WORKSPACE")
 
+	// Create subdirectory and file
+	subDir := filepath.Join(tmpDir, "documents")
+	require.NoError(t, os.MkdirAll(subDir, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(subDir, "note.txt"), []byte("note content"), 0644))
+
 	params := map[string]any{
-		"path": "../../etc/passwd",
+		"path": "documents/note.txt",
 	}
 
-	_, err := ReadFile(params)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "path traversal detected")
+	result, err := ReadFile(params)
+	assert.NoError(t, err)
+	assert.Contains(t, result, "note content")
+	assert.Contains(t, result, `"success": true`)
 }
 
 func TestReadFile_FileNotFound(t *testing.T) {
 	tmpDir := t.TempDir()
 	os.Setenv("MINDX_WORKSPACE", tmpDir)
 	defer os.Unsetenv("MINDX_WORKSPACE")
-
-	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "documents"), 0755))
 
 	params := map[string]any{
 		"path": "nonexistent.txt",

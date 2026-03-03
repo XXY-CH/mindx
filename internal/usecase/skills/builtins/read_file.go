@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 )
 
-// ReadFile reads content from a file with security validation
+// ReadFile reads content from a file
+// Absolute paths are used directly; relative paths resolve against MINDX_WORKSPACE
 func ReadFile(params map[string]any) (string, error) {
 	path, ok := params["path"].(string)
 	if !ok || path == "" {
@@ -18,42 +18,15 @@ func ReadFile(params map[string]any) (string, error) {
 
 	startTime := time.Now()
 
-	// SECURITY: Reject path traversal patterns
 	cleanPath := filepath.Clean(path)
-	if strings.Contains(cleanPath, "..") {
-		return "", fmt.Errorf("path traversal detected: .. not allowed")
-	}
 
-	// Determine base directory
-	workDir := os.Getenv("MINDX_WORKSPACE")
-	if workDir == "" {
-		return "", fmt.Errorf("MINDX_WORKSPACE environment variable is not set")
-	}
-
-	// SECURITY: Always resolve paths relative to workspace base directory
-	// Even absolute paths are rejected to prevent arbitrary file reads
-	baseDir := filepath.Join(workDir, "documents")
-	if _, err := os.Stat(baseDir); os.IsNotExist(err) {
-		baseDir = filepath.Join(workDir, "data")
-	}
-
-	cleanBase := filepath.Clean(baseDir)
-
-	if filepath.IsAbs(cleanPath) {
-		// Absolute path: validate it's within workspace via filepath.Rel
-		// filepath.Rel handles cross-platform case sensitivity correctly
-		rel, err := filepath.Rel(cleanBase, cleanPath)
-		if err != nil || strings.HasPrefix(rel, "..") {
-			return "", fmt.Errorf("access denied: absolute path outside workspace directory")
+	// Resolve relative paths against workspace root
+	if !filepath.IsAbs(cleanPath) {
+		workDir := os.Getenv("MINDX_WORKSPACE")
+		if workDir == "" {
+			return "", fmt.Errorf("MINDX_WORKSPACE environment variable is not set")
 		}
-	} else {
-		cleanPath = filepath.Clean(filepath.Join(baseDir, cleanPath))
-	}
-
-	// Final validation: ensure resolved path is still within base directory
-	rel, err := filepath.Rel(cleanBase, cleanPath)
-	if err != nil || strings.HasPrefix(rel, "..") {
-		return "", fmt.Errorf("access denied: path outside allowed directory")
+		cleanPath = filepath.Clean(filepath.Join(workDir, cleanPath))
 	}
 
 	// Check file exists

@@ -51,34 +51,24 @@ REAL_PATH=$(realpath -m "$FULL_PATH" 2>/dev/null)
 // 1. filepath.Clean 规范化路径
 cleanPath := filepath.Clean(path)
 
-// 2. 检测路径遍历（规范化后检查）
-if strings.Contains(cleanPath, "..") {
-    return "", fmt.Errorf("path traversal detected: .. not allowed")
+// 2. 相对路径解析到 workspace 根目录
+if !filepath.IsAbs(cleanPath) {
+    cleanPath = filepath.Clean(filepath.Join(workDir, cleanPath))
 }
 
-// 3. 绝对路径验证：使用 filepath.Rel 精确计算相对路径
-rel, err := filepath.Rel(cleanBase, cleanPath)
-if err != nil || strings.HasPrefix(rel, "..") {
-    return "", fmt.Errorf("access denied: absolute path outside workspace directory")
-}
-
-// 4. 最终验证：确保解析后的路径仍在允许的目录内
-rel, err = filepath.Rel(cleanBase, cleanPath)
-if err != nil || strings.HasPrefix(rel, "..") {
-    return "", fmt.Errorf("access denied: path outside allowed directory")
-}
+// 3. 绝对路径直接使用，允许访问 workspace 内外的文件
 ```
 
-**防护层级**：
+**设计理念**：
 
-| 层级 | 防护措施 | 拦截的攻击 |
-|------|---------|-----------|
-| 1 | `filepath.Clean()` 规范化 | `./../../etc/passwd` |
-| 2 | `..` 模式检测 | `../../../etc/passwd` |
-| 3 | 绝对路径 `filepath.Rel()` 验证 | `/etc/passwd` |
-| 4 | 最终路径边界检查 | 任何逃逸工作区的路径 |
+MindX 作为个人 AI 助手，需要能够读取用户机器上的任何文件（配置文件、日志、代码等）。过度限制会导致功能缺失。
 
-**限制范围**：仅允许读取 `$MINDX_WORKSPACE/documents` 或 `$MINDX_WORKSPACE/data` 目录下的文件。
+| 路径类型 | 行为 | 示例 |
+|---------|------|------|
+| 相对路径 | 解析到 `$MINDX_WORKSPACE` 根目录 | `documents/note.txt` → `~/.mindx/documents/note.txt` |
+| 绝对路径 | 直接使用 | `/etc/hosts` → `/etc/hosts` |
+
+**安全保障**：`filepath.Clean()` 规范化路径，消除冗余的 `.` 和 `..` 组件。写入操作（`write_file`）仍然限制在 workspace 内。
 
 ---
 
@@ -193,10 +183,10 @@ func validateAndSanitizePath(baseDir, userPath, filename string) (string, error)
 
 | 测试用例 | 验证内容 | 状态 |
 |---------|---------|------|
-| `TestReadFile_ValidFile` | 正常文件读取 | ✅ PASS |
-| `TestReadFile_AbsolutePath` | 工作区内绝对路径（允许） | ✅ PASS |
-| `TestReadFile_AbsolutePathOutsideWorkspace` | 工作区外绝对路径（拦截） | ✅ PASS |
-| `TestReadFile_PathTraversal` | `../../etc/passwd` 路径遍历（拦截） | ✅ PASS |
+| `TestReadFile_ValidFile` | 正常文件读取（相对路径） | ✅ PASS |
+| `TestReadFile_AbsolutePath` | 绝对路径读取 | ✅ PASS |
+| `TestReadFile_AbsolutePathOutsideWorkspace` | 工作区外绝对路径（允许） | ✅ PASS |
+| `TestReadFile_RelativePathResolvesToWorkspace` | 相对路径解析到 workspace | ✅ PASS |
 | `TestReadFile_FileNotFound` | 文件不存在（优雅返回） | ✅ PASS |
 | `TestReadFile_MissingParam` | 缺少参数（拦截） | ✅ PASS |
 
@@ -238,18 +228,18 @@ func validateAndSanitizePath(baseDir, userPath, filename string) (string, error)
 │                   MINDX_WORKSPACE                 │
 │  ┌──────────────┐  ┌──────────────┐              │
 │  │  documents/   │  │    data/      │              │
-│  │  (读写允许)    │  │  (只读允许)    │              │
+│  │  (读写允许)    │  │  (读允许)      │              │
 │  └──────────────┘  └──────────────┘              │
 │  ┌──────────────┐  ┌──────────────┐              │
 │  │  config/      │  │   models/     │              │
-│  │  (工具不可访问) │  │ (工具不可访问)  │              │
+│  │  (读允许)      │  │  (读允许)      │              │
 │  └──────────────┘  └──────────────┘              │
 └──────────────────────────────────────────────────┘
           │
-          ▼ 禁止访问
+          ▼ read_file: 允许读取 / write_file: 禁止写入
 ┌──────────────────────────────────────────────────┐
-│  /etc/passwd  /root  ~  /var  /usr  ...           │
-│  （工作区外的所有路径一律拒绝）                      │
+│  /etc/hosts  ~/Desktop  /var/log  ...             │
+│  （read_file 可读取任意路径，write_file 仅限 workspace） │
 └──────────────────────────────────────────────────┘
 ```
 
@@ -260,7 +250,8 @@ func validateAndSanitizePath(baseDir, userPath, filename string) (string, error)
 | 设计原则 | 实现体现 |
 |---------|---------|
 | 轻量化 | Go 内置实现，无外部依赖 |
-| 安全边界 | 工作区沙箱，工具只能访问 documents/data |
+| 功能完整 | read_file 可读取任意文件，不因隔离导致功能缺失 |
+| 安全写入 | write_file 仍限制在 workspace/documents 内 |
 | 跨平台 | Windows + macOS + Linux 全支持 |
-| 零配置 | 默认安全，无需额外配置 |
-| 可测试 | 23 项自动化测试覆盖所有攻击向量 |
+| 零配置 | 默认可用，无需额外配置 |
+| 可测试 | 23 项自动化测试覆盖核心场景 |
