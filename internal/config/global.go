@@ -12,9 +12,9 @@ type GlobalConfig struct {
 	EmbeddingModel string            `mapstructure:"embedding_model" json:"embedding_model" yaml:"embedding_model"`
 	DefaultModel   string            `mapstructure:"default_model" json:"default_model" yaml:"default_model"`
 	Memory         MemoryConfig      `mapstructure:"memory,omitempty" json:"memory,omitempty" yaml:"memory,omitempty"`
-	VectorStore    VectorStoreConfig `mapstructure:"vector_store" json:"vector_store" yaml:"vector_store"`
-	WebSocket          WebSocketConfig          `mapstructure:"websocket,omitempty" json:"websocket,omitempty" yaml:"websocket,omitempty"`
-	GatewayProtection  GatewayProtectionConfig  `mapstructure:"gateway_protection,omitempty" json:"gateway_protection,omitempty" yaml:"gateway_protection,omitempty"`
+	VectorStore       VectorStoreConfig       `mapstructure:"vector_store" json:"vector_store" yaml:"vector_store"`
+	WebSocket         WebSocketConfig         `mapstructure:"websocket,omitempty" json:"websocket,omitempty" yaml:"websocket,omitempty"`
+	GatewayProtection GatewayProtectionConfig `mapstructure:"gateway_protection,omitempty" json:"gateway_protection,omitempty" yaml:"gateway_protection,omitempty"`
 }
 
 // GatewayProtectionConfig Gateway 防护插件配置

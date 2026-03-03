@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useTranslation } from './i18n';
+import { useTranslation } from '../i18n';
 import './GeneralSettings.css';
 
 interface GeneralConfig {
@@ -29,6 +29,7 @@ export default function GeneralSettings() {
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [messageType, setMessageType] = useState<'success' | 'error'>('success');
 
   useEffect(() => {
     fetchConfig();
@@ -61,13 +62,16 @@ export default function GeneralSettings() {
       });
 
       if (response.ok) {
-        setMessage(t('settings.saveSuccess') || '配置保存成功！');
+        setMessageType('success');
+        setMessage(t('settings.saveSuccess'));
       } else {
-        setMessage(t('settings.saveFailed') || '配置保存失败');
+        setMessageType('error');
+        setMessage(t('settings.saveFailed'));
       }
     } catch (error) {
       console.error('Failed to save config:', error);
-      setMessage(t('settings.saveFailed') || '配置保存失败');
+      setMessageType('error');
+      setMessage(t('settings.saveFailed'));
     }
     setLoading(false);
   };
@@ -100,22 +104,22 @@ export default function GeneralSettings() {
       </div>
 
       <div className="config-section">
-        <h3>工作区设置</h3>
+        <h3>{t('settings.workspace')}</h3>
         <div className="config-item">
-          <label>工作区路径</label>
+          <label>{t('settings.workspacePath')}</label>
           <input
             type="text"
             value={config.workplace}
             onChange={(e) => setConfig({ ...config, workplace: e.target.value })}
-            placeholder="数据库存储路径"
+            placeholder={t('settings.workspacePathPlaceholder')}
           />
         </div>
       </div>
 
       <div className="config-section">
-        <h3>服务器设置</h3>
+        <h3>{t('settings.serverSettings')}</h3>
         <div className="config-item">
-          <label>服务器地址</label>
+          <label>{t('settings.serverAddress')}</label>
           <input
             type="text"
             value={config.server.address}
@@ -124,7 +128,7 @@ export default function GeneralSettings() {
           />
         </div>
         <div className="config-item">
-          <label>服务器端口</label>
+          <label>{t('settings.serverPort')}</label>
           <input
             type="number"
             value={config.server.port}
@@ -136,11 +140,11 @@ export default function GeneralSettings() {
 
       <div className="config-actions">
         <button className="save-button" onClick={handleSave} disabled={loading}>
-          {loading ? '保存中...' : '保存配置'}
+          {loading ? t('settings.saving') : t('settings.save')}
         </button>
       </div>
 
-      {message && <div className={`message ${message.includes('成功') || message.includes('success') ? 'success' : 'error'}`}>{message}</div>}
+      {message && <div className={`message ${messageType}`}>{message}</div>}
     </div>
   );
 }
