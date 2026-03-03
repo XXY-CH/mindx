@@ -77,9 +77,9 @@ package ratelimit
 type NoopProvider struct{}
 
 func NewNoopProvider() *NoopProvider { return &NoopProvider{} }
-func (p *NoopProvider) Name() string              { return "noop" }
-func (p *NoopProvider) Enabled() bool             { return false }
-func (p *NoopProvider) Middleware() gin.HandlerFunc { return nil }
+func (p *NoopProvider) Name() string               { return "noop" }
+func (p *NoopProvider) Enabled() bool              { return false }
+func (p *NoopProvider) Middleware() gin.HandlerFunc { return nil } // 中间件层已处理 nil 情况
 ```
 
 ### 步骤 3：在中间件层集成

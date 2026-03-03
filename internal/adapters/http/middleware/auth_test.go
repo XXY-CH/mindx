@@ -62,8 +62,8 @@ func (m *mockAuthProvider) Middleware() gin.HandlerFunc {
 			// 使用中间件注入的 i18n 消息
 			msg, _ := c.Get("auth.unauthorized_message")
 			errMsg := "unauthorized"
-			if msg != nil && msg.(string) != "" {
-				errMsg = msg.(string)
+			if msgStr, ok := msg.(string); ok && msgStr != "" {
+				errMsg = msgStr
 			}
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": errMsg})
 			return
