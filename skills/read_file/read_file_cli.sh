@@ -31,7 +31,7 @@ normalize_path() {
     if realpath -m "$input" >/dev/null 2>&1; then
         realpath -m "$input"
     elif command -v python3 >/dev/null 2>&1; then
-        python3 -c 'import os,sys; print(os.path.abspath(sys.argv[1]))' "$input"
+        python3 -c 'import os,sys; print(os.path.normpath(os.path.abspath(sys.argv[1])))' "$input"
     else
         echo '{"error": "Path normalization failed: realpath -m and python3 are unavailable"}' >&2
         return 1

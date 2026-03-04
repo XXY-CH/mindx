@@ -39,6 +39,10 @@ func WriteFile(params map[string]any) (string, error) {
 		return "", fmt.Errorf("failed to resolve workspace path: %w", err)
 	}
 	workDir = absWorkDir
+	resolvedWorkDir, err := filepath.EvalSymlinks(workDir)
+	if err != nil {
+		return "", fmt.Errorf("workspace path contains unresolvable symlinks %s: %w", workDir, err)
+	}
 
 	// Determine the target file path
 	var filePath string
@@ -84,7 +88,7 @@ func WriteFile(params map[string]any) (string, error) {
 		return "", fmt.Errorf("failed to resolve path %s: %w", dir, err)
 	}
 	if needsWorkspaceBoundaryCheck {
-		if !isPathWithinWorkspace(workDir, filepath.Join(resolvedDir, filepath.Base(filePath))) {
+		if !isPathWithinWorkspace(resolvedWorkDir, filepath.Join(resolvedDir, filepath.Base(filePath))) {
 			return "", fmt.Errorf("path outside workspace is not allowed")
 		}
 	}
@@ -119,5 +123,12 @@ func getJSONWriteResult(filePath string, contentLength int, elapsed time.Duratio
 
 func isPathWithinWorkspace(workDir, targetPath string) bool {
 	relPath, relErr := filepath.Rel(workDir, filepath.Clean(targetPath))
-	return relErr == nil && relPath != ".." && !strings.HasPrefix(relPath, ".."+string(filepath.Separator))
+	if relErr != nil {
+		return false
+	}
+	// Writing directly into workspace root is allowed.
+	if relPath == "." {
+		return true
+	}
+	return relPath != ".." && !strings.HasPrefix(relPath, ".."+string(filepath.Separator))
 }
