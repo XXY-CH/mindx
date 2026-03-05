@@ -1,13 +1,34 @@
 package builtins
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func writeReadFileAccessConfigForTest(t *testing.T, workspace string, enabled bool, allowedPaths []string) {
+	t.Helper()
+
+	configDir := filepath.Join(workspace, "config")
+	require.NoError(t, os.MkdirAll(configDir, 0755))
+
+	var b strings.Builder
+	b.WriteString("server:\n")
+	b.WriteString(fmt.Sprintf("  file_access:\n    enabled: %t\n", enabled))
+	if len(allowedPaths) > 0 {
+		b.WriteString("    allowed_paths:\n")
+		for _, p := range allowedPaths {
+			b.WriteString(fmt.Sprintf("      - %q\n", p))
+		}
+	}
+
+	require.NoError(t, os.WriteFile(filepath.Join(configDir, "server.yml"), []byte(b.String()), 0644))
+}
 
 func TestReadFile_ValidFile(t *testing.T) {
 	tmpDir := t.TempDir()
@@ -108,4 +129,35 @@ func TestReadFile_MissingParam(t *testing.T) {
 	_, err := ReadFile(params)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid param")
+}
+
+func TestReadFile_FileAccessEnabled_DefaultWorkspaceOnly(t *testing.T) {
+	tmpDir := t.TempDir()
+	os.Setenv("MINDX_WORKSPACE", tmpDir)
+	defer os.Unsetenv("MINDX_WORKSPACE")
+	writeReadFileAccessConfigForTest(t, tmpDir, true, nil)
+
+	outsideFile := filepath.Join(t.TempDir(), "outside.txt")
+	require.NoError(t, os.WriteFile(outsideFile, []byte("outside content"), 0644))
+
+	result, err := ReadFile(map[string]any{"path": outsideFile})
+	assert.NoError(t, err)
+	assert.Contains(t, result, `"success": false`)
+	assert.Contains(t, result, "读取路径超出允许范围")
+}
+
+func TestReadFile_FileAccessEnabled_AllowsConfiguredExternalPath(t *testing.T) {
+	tmpDir := t.TempDir()
+	os.Setenv("MINDX_WORKSPACE", tmpDir)
+	defer os.Unsetenv("MINDX_WORKSPACE")
+
+	allowedDir := t.TempDir()
+	allowedFile := filepath.Join(allowedDir, "allowed.txt")
+	require.NoError(t, os.WriteFile(allowedFile, []byte("allowed content"), 0644))
+	writeReadFileAccessConfigForTest(t, tmpDir, true, []string{allowedDir})
+
+	result, err := ReadFile(map[string]any{"path": allowedFile})
+	assert.NoError(t, err)
+	assert.Contains(t, result, `"success": true`)
+	assert.Contains(t, result, "allowed content")
 }

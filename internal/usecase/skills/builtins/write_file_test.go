@@ -1,12 +1,34 @@
 package builtins
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func writeFileAccessConfigForTest(t *testing.T, workspace string, enabled bool, allowedPaths []string) {
+	t.Helper()
+
+	configDir := filepath.Join(workspace, "config")
+	require.NoError(t, os.MkdirAll(configDir, 0755))
+
+	var b strings.Builder
+	b.WriteString("server:\n")
+	b.WriteString(fmt.Sprintf("  file_access:\n    enabled: %t\n", enabled))
+	if len(allowedPaths) > 0 {
+		b.WriteString("    allowed_paths:\n")
+		for _, p := range allowedPaths {
+			b.WriteString(fmt.Sprintf("      - %q\n", p))
+		}
+	}
+
+	require.NoError(t, os.WriteFile(filepath.Join(configDir, "server.yml"), []byte(b.String()), 0644))
+}
 
 func TestWriteFile_ValidWrite(t *testing.T) {
 	tmpDir := t.TempDir()
@@ -62,8 +84,11 @@ func TestWriteFile_AbsolutePathInFilename(t *testing.T) {
 	}
 
 	_, err := WriteFile(params)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "dangerous=true")
+	assert.NoError(t, err)
+
+	content, err := os.ReadFile(targetFile)
+	assert.NoError(t, err)
+	assert.Equal(t, "absolute write", string(content))
 }
 
 func TestWriteFile_AbsolutePathParam(t *testing.T) {
@@ -80,8 +105,11 @@ func TestWriteFile_AbsolutePathParam(t *testing.T) {
 	}
 
 	_, err := WriteFile(params)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "dangerous=true")
+	assert.NoError(t, err)
+
+	content, err := os.ReadFile(filepath.Join(targetDir, "result.txt"))
+	assert.NoError(t, err)
+	assert.Equal(t, "abs path write", string(content))
 }
 
 func TestWriteFile_AbsolutePathWithDangerousFlag(t *testing.T) {
@@ -152,6 +180,8 @@ func TestWriteFile_PathTraversalBlockedByFilename(t *testing.T) {
 	os.Setenv("MINDX_WORKSPACE", tmpDir)
 	defer os.Unsetenv("MINDX_WORKSPACE")
 
+	writeFileAccessConfigForTest(t, tmpDir, true, nil)
+
 	params := map[string]any{
 		"filename": "../escape.txt",
 		"content":  "blocked",
@@ -159,13 +189,15 @@ func TestWriteFile_PathTraversalBlockedByFilename(t *testing.T) {
 
 	_, err := WriteFile(params)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "outside workspace")
+	assert.Contains(t, err.Error(), "outside allowed scope")
 }
 
 func TestWriteFile_PathTraversalBlockedByPath(t *testing.T) {
 	tmpDir := t.TempDir()
 	os.Setenv("MINDX_WORKSPACE", tmpDir)
 	defer os.Unsetenv("MINDX_WORKSPACE")
+
+	writeFileAccessConfigForTest(t, tmpDir, true, nil)
 
 	params := map[string]any{
 		"filename": "ok.txt",
@@ -175,5 +207,40 @@ func TestWriteFile_PathTraversalBlockedByPath(t *testing.T) {
 
 	_, err := WriteFile(params)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "outside workspace")
+	assert.Contains(t, err.Error(), "outside allowed scope")
+}
+
+func TestWriteFile_FileAccessEnabled_DefaultWorkspaceOnly(t *testing.T) {
+	tmpDir := t.TempDir()
+	os.Setenv("MINDX_WORKSPACE", tmpDir)
+	defer os.Unsetenv("MINDX_WORKSPACE")
+	writeFileAccessConfigForTest(t, tmpDir, true, nil)
+
+	outsideFile := filepath.Join(t.TempDir(), "blocked.txt")
+	_, err := WriteFile(map[string]any{
+		"filename": outsideFile,
+		"content":  "blocked",
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "outside allowed scope")
+}
+
+func TestWriteFile_FileAccessEnabled_AllowsConfiguredExternalDir(t *testing.T) {
+	tmpDir := t.TempDir()
+	os.Setenv("MINDX_WORKSPACE", tmpDir)
+	defer os.Unsetenv("MINDX_WORKSPACE")
+
+	allowedDir := t.TempDir()
+	writeFileAccessConfigForTest(t, tmpDir, true, []string{allowedDir})
+
+	targetFile := filepath.Join(allowedDir, "allowed.txt")
+	_, err := WriteFile(map[string]any{
+		"filename": targetFile,
+		"content":  "allowed",
+	})
+	assert.NoError(t, err)
+
+	content, err := os.ReadFile(targetFile)
+	assert.NoError(t, err)
+	assert.Equal(t, "allowed", string(content))
 }
