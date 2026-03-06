@@ -222,6 +222,7 @@ const translations = {
       save: '保存配置',
       saveSuccess: '配置保存成功！',
       saveFailed: '配置保存失败',
+      loadFailed: '配置加载失败',
     },
     advanced: {
       title: '高级配置',
@@ -514,6 +515,7 @@ const translations = {
       save: 'Save',
       saveSuccess: 'Configuration saved successfully!',
       saveFailed: 'Failed to save configuration',
+      loadFailed: 'Failed to load configuration',
     },
     advanced: {
       title: 'Advanced Settings',

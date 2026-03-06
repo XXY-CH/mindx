@@ -70,7 +70,7 @@ export default function GeneralSettings() {
     } catch (error) {
       console.error('Failed to fetch config:', error);
       setMessageType('error');
-      setMessage(error instanceof Error ? error.message : t('settings.saveFailed'));
+      setMessage(error instanceof Error ? error.message : t('settings.loadFailed'));
     }
   };
 

@@ -55,10 +55,7 @@ func normalizeAllowedPathEntry(workspace, rawPath string) (allowedPathEntry, boo
 		return allowedPathEntry{}, false
 	}
 
-	isDirBySuffix := strings.HasSuffix(rawPath, "/**")
-	if !isDirBySuffix {
-		isDirBySuffix = strings.TrimRight(rawPath, "/\\") != rawPath
-	}
+	isDirBySuffix := strings.HasSuffix(rawPath, "/**") || len(strings.TrimRight(rawPath, "/\\")) < len(rawPath)
 	normalized := strings.TrimSuffix(rawPath, "/**")
 	if normalized == "" {
 		return allowedPathEntry{}, false
