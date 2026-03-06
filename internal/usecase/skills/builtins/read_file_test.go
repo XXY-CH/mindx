@@ -62,6 +62,7 @@ func TestReadFile_AbsolutePathOutsideWorkspaceDeniedByDefault(t *testing.T) {
 	}
 
 	result, err := ReadFile(params)
+	// ReadFile reports business failures inside the JSON payload, while Go errors are reserved for invalid inputs/system failures.
 	assert.NoError(t, err)
 	assert.Contains(t, result, `"success": false`)
 	assert.Contains(t, result, "读取路径超出允许范围")

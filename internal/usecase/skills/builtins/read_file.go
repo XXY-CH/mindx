@@ -29,14 +29,13 @@ func ReadFile(params map[string]any) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve workspace path: %w", err)
 	}
-	workDir = absWorkDir
 	resolvedWorkDir, err := filepath.EvalSymlinks(absWorkDir)
 	if err != nil {
 		return "", fmt.Errorf("workspace path contains unresolvable symlinks %s: %w", absWorkDir, err)
 	}
 
 	if !filepath.IsAbs(cleanPath) {
-		cleanPath = filepath.Clean(filepath.Join(workDir, cleanPath))
+		cleanPath = filepath.Clean(filepath.Join(absWorkDir, cleanPath))
 	}
 	filePolicy, err := loadFileAccessPolicy(resolvedWorkDir)
 	if err != nil {

@@ -55,7 +55,10 @@ func normalizeAllowedPathEntry(workspace, rawPath string) (allowedPathEntry, boo
 		return allowedPathEntry{}, false
 	}
 
-	isDirBySuffix := strings.HasSuffix(rawPath, "/**") || len(strings.TrimRight(rawPath, "/\\")) < len(rawPath)
+	// Accept both slash styles from user config input regardless of current runtime OS.
+	isDirBySuffix := strings.HasSuffix(rawPath, "/**") ||
+		strings.HasSuffix(rawPath, "/") ||
+		strings.HasSuffix(rawPath, "\\")
 	normalized := strings.TrimSuffix(rawPath, "/**")
 	if normalized == "" {
 		return allowedPathEntry{}, false
