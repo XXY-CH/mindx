@@ -29,6 +29,7 @@ func ReadFile(params map[string]any) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve workspace path: %w", err)
 	}
+	workDir = absWorkDir
 	resolvedWorkDir, err := filepath.EvalSymlinks(absWorkDir)
 	if err != nil {
 		return "", fmt.Errorf("workspace path contains unresolvable symlinks %s: %w", absWorkDir, err)

@@ -46,7 +46,7 @@ func TestReadFile_AbsolutePath(t *testing.T) {
 	assert.Contains(t, result, "absolute content")
 }
 
-func TestReadFile_AbsolutePathOutsideWorkspace(t *testing.T) {
+func TestReadFile_AbsolutePathOutsideWorkspaceDeniedByDefault(t *testing.T) {
 	tmpDir := t.TempDir()
 	os.Setenv("MINDX_WORKSPACE", tmpDir)
 	defer os.Unsetenv("MINDX_WORKSPACE")
@@ -56,15 +56,15 @@ func TestReadFile_AbsolutePathOutsideWorkspace(t *testing.T) {
 	outsideFile := filepath.Join(outsideDir, "outside.txt")
 	require.NoError(t, os.WriteFile(outsideFile, []byte("outside content"), 0644))
 
-	// Absolute path outside workspace should be allowed
+	// Absolute path outside workspace should be denied by default
 	params := map[string]any{
 		"path": outsideFile,
 	}
 
 	result, err := ReadFile(params)
 	assert.NoError(t, err)
-	assert.Contains(t, result, "outside content")
-	assert.Contains(t, result, `"success": true`)
+	assert.Contains(t, result, `"success": false`)
+	assert.Contains(t, result, "读取路径超出允许范围")
 }
 
 func TestReadFile_RelativePathResolvesToWorkspace(t *testing.T) {

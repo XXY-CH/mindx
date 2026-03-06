@@ -31,7 +31,7 @@ export default function GeneralSettings() {
       mode: '',
     },
     file_access: {
-      enabled: false,
+      enabled: true,
       allowed_paths: [],
     },
   });
@@ -49,13 +49,23 @@ export default function GeneralSettings() {
         fetch('/api/config/general'),
         fetch('/api/config/file-access'),
       ]);
+      if (!generalResponse.ok) {
+        throw new Error(
+          `Failed to fetch general config: ${generalResponse.status} ${generalResponse.statusText}`,
+        );
+      }
+      if (!fileAccessResponse.ok) {
+        throw new Error(
+          `Failed to fetch file access config: ${fileAccessResponse.status} ${fileAccessResponse.statusText}`,
+        );
+      }
       const data = await generalResponse.json();
       const fileAccessData = await fileAccessResponse.json();
       setConfig({
         workplace: data.workplace || 'data',
         server: data.server || { address: '0.0.0.0', port: 1314 },
         gateway_protection: data.gateway_protection || { enabled: false, mode: '' },
-        file_access: fileAccessData.file_access || { enabled: false, allowed_paths: [] },
+        file_access: fileAccessData.file_access || { enabled: true, allowed_paths: [] },
       });
     } catch (error) {
       console.error('Failed to fetch config:', error);

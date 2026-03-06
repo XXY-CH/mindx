@@ -21,14 +21,14 @@ type allowedPathEntry struct {
 
 func loadFileAccessPolicy(workspace string) (fileAccessPolicy, error) {
 	policy := fileAccessPolicy{
-		enabled:        false,
+		enabled:        true,
 		workspace:      workspace,
 		allowedEntries: nil,
 	}
 
 	cfg, err := config.LoadServerConfig()
 	if err != nil {
-		// Default to unrestricted mode for backward compatibility when config cannot be loaded.
+		// Fail closed when config cannot be loaded: only workspace remains accessible.
 		return policy, nil
 	}
 
@@ -39,26 +39,49 @@ func loadFileAccessPolicy(workspace string) (fileAccessPolicy, error) {
 
 	normalizedAllowed := make([]allowedPathEntry, 0, len(cfg.FileAccess.AllowedPaths))
 	for _, p := range cfg.FileAccess.AllowedPaths {
-		p = strings.TrimSpace(p)
-		if p == "" {
+		entry, ok := normalizeAllowedPathEntry(workspace, p)
+		if !ok {
 			continue
-		}
-		if !filepath.IsAbs(p) {
-			p = filepath.Join(workspace, p)
-		}
-		p = filepath.Clean(p)
-		absPath, absErr := filepath.Abs(p)
-		if absErr != nil {
-			continue
-		}
-		entry := allowedPathEntry{path: absPath}
-		if info, statErr := os.Stat(absPath); statErr == nil {
-			entry.isDir = info.IsDir()
 		}
 		normalizedAllowed = append(normalizedAllowed, entry)
 	}
 	policy.allowedEntries = normalizedAllowed
 	return policy, nil
+}
+
+func normalizeAllowedPathEntry(workspace, rawPath string) (allowedPathEntry, bool) {
+	rawPath = strings.TrimSpace(rawPath)
+	if rawPath == "" {
+		return allowedPathEntry{}, false
+	}
+
+	isDirBySuffix := strings.HasSuffix(rawPath, string(filepath.Separator)) ||
+		strings.HasSuffix(rawPath, "/") ||
+		strings.HasSuffix(rawPath, "\\") ||
+		strings.HasSuffix(rawPath, "/**")
+	normalized := strings.TrimSuffix(rawPath, "/**")
+	if normalized == "" {
+		return allowedPathEntry{}, false
+	}
+
+	if !filepath.IsAbs(normalized) {
+		normalized = filepath.Join(workspace, normalized)
+	}
+	normalized = filepath.Clean(normalized)
+	absPath, absErr := filepath.Abs(normalized)
+	if absErr != nil {
+		return allowedPathEntry{}, false
+	}
+
+	entry := allowedPathEntry{
+		path:  absPath,
+		isDir: isDirBySuffix,
+	}
+	if info, statErr := os.Stat(absPath); statErr == nil && info.IsDir() {
+		entry.isDir = true
+	}
+
+	return entry, true
 }
 
 func (p fileAccessPolicy) isAllowed(targetPath string) bool {

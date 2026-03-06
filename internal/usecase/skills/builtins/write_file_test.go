@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestWriteFile_ValidWrite(t *testing.T) {
@@ -220,5 +221,40 @@ func TestWriteFile_FileAccessEnabled_AllowsConfiguredExternalDir(t *testing.T) {
 
 	content, err := os.ReadFile(targetFile)
 	assert.NoError(t, err)
+	assert.Equal(t, "allowed", string(content))
+}
+
+func TestWriteFile_DefaultPolicyDeniesAbsoluteOutsideWorkspace(t *testing.T) {
+	tmpDir := t.TempDir()
+	os.Setenv("MINDX_WORKSPACE", tmpDir)
+	defer os.Unsetenv("MINDX_WORKSPACE")
+
+	outsideFile := filepath.Join(t.TempDir(), "blocked.txt")
+	_, err := WriteFile(map[string]any{
+		"filename": outsideFile,
+		"content":  "blocked",
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "outside allowed scope")
+}
+
+func TestWriteFile_FileAccessEnabled_AllowsNonExistentExternalDirPattern(t *testing.T) {
+	tmpDir := t.TempDir()
+	os.Setenv("MINDX_WORKSPACE", tmpDir)
+	defer os.Unsetenv("MINDX_WORKSPACE")
+
+	parentDir := t.TempDir()
+	allowedDir := filepath.Join(parentDir, "new-allowed-dir")
+	writeFileAccessConfigForTest(t, tmpDir, true, []string{allowedDir + "/**"})
+
+	targetFile := filepath.Join(allowedDir, "nested", "allowed.txt")
+	_, err := WriteFile(map[string]any{
+		"filename": targetFile,
+		"content":  "allowed",
+	})
+	require.NoError(t, err)
+
+	content, readErr := os.ReadFile(targetFile)
+	require.NoError(t, readErr)
 	assert.Equal(t, "allowed", string(content))
 }
